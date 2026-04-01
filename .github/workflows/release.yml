@@ -11,7 +11,7 @@ permissions:
 jobs:
   build:
     name: Build Signed Release APK
-    runs-on: [self-hosted, tuf-a15]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
