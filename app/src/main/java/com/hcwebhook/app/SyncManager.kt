@@ -248,6 +248,7 @@ class SyncManager(private val context: Context) {
                             put("count", step.count)
                             put("start_time", step.startTime.toString())
                             put("end_time", step.endTime.toString())
+                            step.sourceApp?.let { put("source_app", it) }
                         })
                     }
                 }
