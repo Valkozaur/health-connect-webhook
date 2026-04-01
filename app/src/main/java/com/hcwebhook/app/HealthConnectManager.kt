@@ -152,11 +152,29 @@ data class RestingHeartRateData(
     val time: Instant
 )
 
+data class ExerciseSegmentData(
+    val type: String,
+    val startTime: Instant,
+    val endTime: Instant,
+    val repetitions: Int
+)
+
+data class ExerciseLapData(
+    val startTime: Instant,
+    val endTime: Instant,
+    val lengthMeters: Double?
+)
+
 data class ExerciseData(
     val type: String,
     val startTime: Instant,
     val endTime: Instant,
-    val duration: Duration
+    val duration: Duration,
+    val title: String?,
+    val notes: String?,
+    val sourceApp: String?,
+    val segments: List<ExerciseSegmentData>,
+    val laps: List<ExerciseLapData>
 )
 
 data class HydrationData(
@@ -552,7 +570,168 @@ class HealthConnectManager(private val context: Context) {
         val request = ReadRecordsRequest(recordType = ExerciseSessionRecord::class, timeRangeFilter = TimeRangeFilter.between(startTime, endTime))
         val response = healthConnectClient.readRecords(request)
         return response.records.filter { lastSync == null || it.endTime >= lastSync }
-            .map { ExerciseData(it.exerciseType.toString(), it.startTime, it.endTime, Duration.between(it.startTime, it.endTime)) }
+            .map { session ->
+                ExerciseData(
+                    type = exerciseTypeToString(session.exerciseType),
+                    startTime = session.startTime,
+                    endTime = session.endTime,
+                    duration = Duration.between(session.startTime, session.endTime),
+                    title = session.title,
+                    notes = session.notes,
+                    sourceApp = session.metadata.dataOrigin.packageName,
+                    segments = session.segments.map { seg ->
+                        ExerciseSegmentData(
+                            type = segmentTypeToString(seg.segmentType),
+                            startTime = seg.startTime,
+                            endTime = seg.endTime,
+                            repetitions = seg.repetitions
+                        )
+                    },
+                    laps = session.laps.map { lap ->
+                        ExerciseLapData(
+                            startTime = lap.startTime,
+                            endTime = lap.endTime,
+                            lengthMeters = lap.length?.inMeters
+                        )
+                    }
+                )
+            }
+    }
+
+    private fun exerciseTypeToString(type: Int): String {
+        return when (type) {
+            ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON -> "BADMINTON"
+            ExerciseSessionRecord.EXERCISE_TYPE_BASEBALL -> "BASEBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_BASKETBALL -> "BASKETBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING -> "BIKING"
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY -> "BIKING_STATIONARY"
+            ExerciseSessionRecord.EXERCISE_TYPE_BOOT_CAMP -> "BOOT_CAMP"
+            ExerciseSessionRecord.EXERCISE_TYPE_BOXING -> "BOXING"
+            ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS -> "CALISTHENICS"
+            ExerciseSessionRecord.EXERCISE_TYPE_CRICKET -> "CRICKET"
+            ExerciseSessionRecord.EXERCISE_TYPE_DANCING -> "DANCING"
+            ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL -> "ELLIPTICAL"
+            ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS -> "EXERCISE_CLASS"
+            ExerciseSessionRecord.EXERCISE_TYPE_FENCING -> "FENCING"
+            ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AMERICAN -> "FOOTBALL_AMERICAN"
+            ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AUSTRALIAN -> "FOOTBALL_AUSTRALIAN"
+            ExerciseSessionRecord.EXERCISE_TYPE_FRISBEE_DISC -> "FRISBEE_DISC"
+            ExerciseSessionRecord.EXERCISE_TYPE_GOLF -> "GOLF"
+            ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING -> "GUIDED_BREATHING"
+            ExerciseSessionRecord.EXERCISE_TYPE_GYMNASTICS -> "GYMNASTICS"
+            ExerciseSessionRecord.EXERCISE_TYPE_HANDBALL -> "HANDBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> "HIIT"
+            ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> "HIKING"
+            ExerciseSessionRecord.EXERCISE_TYPE_ICE_HOCKEY -> "ICE_HOCKEY"
+            ExerciseSessionRecord.EXERCISE_TYPE_ICE_SKATING -> "ICE_SKATING"
+            ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS -> "MARTIAL_ARTS"
+            ExerciseSessionRecord.EXERCISE_TYPE_PADDLING -> "PADDLING"
+            ExerciseSessionRecord.EXERCISE_TYPE_PARAGLIDING -> "PARAGLIDING"
+            ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> "PILATES"
+            ExerciseSessionRecord.EXERCISE_TYPE_RACQUETBALL -> "RACQUETBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROCK_CLIMBING -> "ROCK_CLIMBING"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROLLER_HOCKEY -> "ROLLER_HOCKEY"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING -> "ROWING"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE -> "ROWING_MACHINE"
+            ExerciseSessionRecord.EXERCISE_TYPE_RUGBY -> "RUGBY"
+            ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "RUNNING"
+            ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> "RUNNING_TREADMILL"
+            ExerciseSessionRecord.EXERCISE_TYPE_SAILING -> "SAILING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SCUBA_DIVING -> "SCUBA_DIVING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SKATING -> "SKATING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SKIING -> "SKIING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SNOWBOARDING -> "SNOWBOARDING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SNOWSHOEING -> "SNOWSHOEING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SOCCER -> "SOCCER"
+            ExerciseSessionRecord.EXERCISE_TYPE_SOFTBALL -> "SOFTBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_SQUASH -> "SQUASH"
+            ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING -> "STAIR_CLIMBING"
+            ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE -> "STAIR_CLIMBING_MACHINE"
+            ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING -> "STRENGTH_TRAINING"
+            ExerciseSessionRecord.EXERCISE_TYPE_STRETCHING -> "STRETCHING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SURFING -> "SURFING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> "SWIMMING_OPEN_WATER"
+            ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL -> "SWIMMING_POOL"
+            ExerciseSessionRecord.EXERCISE_TYPE_TABLE_TENNIS -> "TABLE_TENNIS"
+            ExerciseSessionRecord.EXERCISE_TYPE_TENNIS -> "TENNIS"
+            ExerciseSessionRecord.EXERCISE_TYPE_VOLLEYBALL -> "VOLLEYBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> "WALKING"
+            ExerciseSessionRecord.EXERCISE_TYPE_WATER_POLO -> "WATER_POLO"
+            ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING -> "WEIGHTLIFTING"
+            ExerciseSessionRecord.EXERCISE_TYPE_WHEELCHAIR -> "WHEELCHAIR"
+            ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> "YOGA"
+            ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT -> "OTHER_WORKOUT"
+            else -> "UNKNOWN_$type"
+        }
+    }
+
+    private fun segmentTypeToString(type: Int): String {
+        return when (type) {
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_ARM_CURL -> "ARM_CURL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BACK_EXTENSION -> "BACK_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BALL_SLAM -> "BALL_SLAM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_PRESS -> "BENCH_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_SIT_UP -> "BENCH_SIT_UP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING -> "BIKING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING_STATIONARY -> "BIKING_STATIONARY"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BURPEE -> "BURPEE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_CRUNCH -> "CRUNCH"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DEADLIFT -> "DEADLIFT"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DOUBLE_ARM_TRICEPS_EXTENSION -> "DOUBLE_ARM_TRICEPS_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_CURL_LEFT_ARM -> "DUMBBELL_CURL_LEFT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_CURL_RIGHT_ARM -> "DUMBBELL_CURL_RIGHT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_FRONT_RAISE -> "DUMBBELL_FRONT_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_LATERAL_RAISE -> "DUMBBELL_LATERAL_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_ROW -> "DUMBBELL_ROW"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_LEFT_ARM -> "DUMBBELL_TRICEPS_EXTENSION_LEFT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_RIGHT_ARM -> "DUMBBELL_TRICEPS_EXTENSION_RIGHT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_TWO_ARM -> "DUMBBELL_TRICEPS_EXTENSION_TWO_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_ELLIPTICAL -> "ELLIPTICAL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_FORWARD_TWIST -> "FORWARD_TWIST"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_FRONT_RAISE -> "FRONT_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIP_THRUST -> "HIP_THRUST"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_HULA_HOOP -> "HULA_HOOP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMPING_JACK -> "JUMPING_JACK"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMP_ROPE -> "JUMP_ROPE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_KNEE_RAISE -> "KNEE_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE -> "LATERAL_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LAT_PULL_DOWN -> "LAT_PULL_DOWN"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL -> "LEG_CURL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_EXTENSION -> "LEG_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_PRESS -> "LEG_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_RAISE -> "LEG_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LUNGE -> "LUNGE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_MOUNTAIN_CLIMBER -> "MOUNTAIN_CLIMBER"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_OTHER_WORKOUT -> "OTHER_WORKOUT"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PAUSE -> "PAUSE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PILATES -> "PILATES"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PLANK -> "PLANK"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PULL_UP -> "PULL_UP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PUNCH -> "PUNCH"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_REST -> "REST"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE -> "ROWING_MACHINE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING -> "RUNNING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING_TREADMILL -> "RUNNING_TREADMILL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SHOULDER_PRESS -> "SHOULDER_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SINGLE_ARM_TRICEPS_EXTENSION -> "SINGLE_ARM_TRICEPS_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SIT_UP -> "SIT_UP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SQUAT -> "SQUAT"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_STAIR_CLIMBING -> "STAIR_CLIMBING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_STAIR_CLIMBING_MACHINE -> "STAIR_CLIMBING_MACHINE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_STRETCHING -> "STRETCHING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_BACKSTROKE -> "SWIMMING_BACKSTROKE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_BREASTSTROKE -> "SWIMMING_BREASTSTROKE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_BUTTERFLY -> "SWIMMING_BUTTERFLY"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_FREESTYLE -> "SWIMMING_FREESTYLE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_MIXED -> "SWIMMING_MIXED"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_OPEN_WATER -> "SWIMMING_OPEN_WATER"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_UPPER_TWIST -> "UPPER_TWIST"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING -> "WALKING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_WEIGHTLIFTING -> "WEIGHTLIFTING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_WHEELCHAIR -> "WHEELCHAIR"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_YOGA -> "YOGA"
+            else -> "UNKNOWN_$type"
+        }
     }
 
     private suspend fun readHydrationData(startTime: Instant, endTime: Instant, lastSync: Instant?): List<HydrationData> {

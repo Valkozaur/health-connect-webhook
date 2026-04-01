@@ -402,6 +402,28 @@ class SyncManager(private val context: Context) {
                         put("start_time", it.startTime.toString())
                         put("end_time", it.endTime.toString())
                         put("duration_seconds", it.duration.seconds)
+                        it.title?.let { t -> put("title", t) }
+                        it.notes?.let { n -> put("notes", n) }
+                        it.sourceApp?.let { s -> put("source_app", s) }
+                        if (it.segments.isNotEmpty()) {
+                            putJsonArray("segments") {
+                                it.segments.forEach { seg -> add(buildJsonObject {
+                                    put("type", seg.type)
+                                    put("start_time", seg.startTime.toString())
+                                    put("end_time", seg.endTime.toString())
+                                    put("repetitions", seg.repetitions)
+                                }) }
+                            }
+                        }
+                        if (it.laps.isNotEmpty()) {
+                            putJsonArray("laps") {
+                                it.laps.forEach { lap -> add(buildJsonObject {
+                                    put("start_time", lap.startTime.toString())
+                                    put("end_time", lap.endTime.toString())
+                                    lap.lengthMeters?.let { l -> put("length_meters", l) }
+                                }) }
+                            }
+                        }
                     }) }
                 }
             }

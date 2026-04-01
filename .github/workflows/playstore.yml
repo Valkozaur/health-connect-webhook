@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     name: Build Signed App Bundle (AAB)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, tuf-a15]
 
     steps:
       - name: Checkout code
