@@ -693,7 +693,6 @@ class HealthConnectManager(private val context: Context) {
             ExerciseSegment.EXERCISE_SEGMENT_TYPE_HULA_HOOP -> "HULA_HOOP"
             ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMPING_JACK -> "JUMPING_JACK"
             ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMP_ROPE -> "JUMP_ROPE"
-            ExerciseSegment.EXERCISE_SEGMENT_TYPE_KNEE_RAISE -> "KNEE_RAISE"
             ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE -> "LATERAL_RAISE"
             ExerciseSegment.EXERCISE_SEGMENT_TYPE_LAT_PULL_DOWN -> "LAT_PULL_DOWN"
             ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL -> "LEG_CURL"
