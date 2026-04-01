@@ -327,14 +327,21 @@ class HealthConnectManager(private val context: Context) {
         // AggregateRequest. The aggregate API was missing steps from certain
         // sources (e.g. Kingsmith walking pad). Raw records give per-source
         // visibility and let the server sum across sources correctly.
-        val request = ReadRecordsRequest(
-            recordType = StepsRecord::class,
-            timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
-        )
-        val response = healthConnectClient.readRecords(request)
+        val allRecords = mutableListOf<StepsRecord>()
+        var pageToken: String? = null
+        do {
+            val request = ReadRecordsRequest(
+                recordType = StepsRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                pageToken = pageToken
+            )
+            val response = healthConnectClient.readRecords(request)
+            allRecords.addAll(response.records)
+            pageToken = response.pageToken
+        } while (pageToken != null)
         val zone = java.time.ZoneId.systemDefault()
 
-        val filtered = response.records
+        val filtered = allRecords
             .filter { record -> lastSync == null || record.endTime >= lastSync }
 
         // Group by (calendar day, source app) and sum steps per group
