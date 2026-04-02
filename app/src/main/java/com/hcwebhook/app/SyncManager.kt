@@ -299,6 +299,7 @@ class SyncManager(private val context: Context) {
                         put("meters", it.meters)
                         put("start_time", it.startTime.toString())
                         put("end_time", it.endTime.toString())
+                        it.sourceApp?.let { s -> put("source_app", s) }
                     }) }
                 }
             }
@@ -319,6 +320,7 @@ class SyncManager(private val context: Context) {
                         put("calories", it.calories)
                         put("start_time", it.startTime.toString())
                         put("end_time", it.endTime.toString())
+                        it.sourceApp?.let { s -> put("source_app", s) }
                     }) }
                 }
             }
@@ -407,6 +409,8 @@ class SyncManager(private val context: Context) {
                         it.notes?.let { n -> put("notes", n) }
                         it.sourceApp?.let { s -> put("source_app", s) }
                         it.steps?.let { steps -> put("steps", steps) }
+                        it.distanceMeters?.let { d -> put("distance_meters", d) }
+                        it.calories?.let { c -> put("calories", c) }
                         if (it.segments.isNotEmpty()) {
                             putJsonArray("segments") {
                                 it.segments.forEach { seg -> add(buildJsonObject {
@@ -449,6 +453,22 @@ class SyncManager(private val context: Context) {
                         it.fat?.let { f -> put("fat_grams", f) }
                         put("start_time", it.startTime.toString())
                         put("end_time", it.endTime.toString())
+                        it.mealType?.let { mt -> put("meal_type", when (mt) {
+                            1 -> "breakfast"; 2 -> "lunch"; 3 -> "dinner"; 4 -> "snack"; else -> "unknown"
+                        }) }
+                        it.sugar?.let { v -> put("sugar_grams", v) }
+                        it.fiber?.let { v -> put("fiber_grams", v) }
+                        it.saturatedFat?.let { v -> put("saturated_fat_grams", v) }
+                        it.monounsaturatedFat?.let { v -> put("monounsaturated_fat_grams", v) }
+                        it.polyunsaturatedFat?.let { v -> put("polyunsaturated_fat_grams", v) }
+                        it.transFat?.let { v -> put("trans_fat_grams", v) }
+                        it.cholesterol?.let { v -> put("cholesterol_grams", v) }
+                        it.sodium?.let { v -> put("sodium_grams", v) }
+                        it.potassium?.let { v -> put("potassium_grams", v) }
+                        it.calcium?.let { v -> put("calcium_grams", v) }
+                        it.iron?.let { v -> put("iron_grams", v) }
+                        it.vitaminA?.let { v -> put("vitamin_a_grams", v) }
+                        it.sourceApp?.let { s -> put("source_app", s) }
                     }) }
                 }
             }
