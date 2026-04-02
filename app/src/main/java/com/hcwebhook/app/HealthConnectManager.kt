@@ -97,7 +97,8 @@ data class HeartRateVariabilityData(
 data class DistanceData(
     val meters: Double,
     val startTime: Instant,
-    val endTime: Instant
+    val endTime: Instant,
+    val sourceApp: String? = null
 )
 
 data class ActiveCaloriesData(
@@ -109,7 +110,8 @@ data class ActiveCaloriesData(
 data class TotalCaloriesData(
     val calories: Double,
     val startTime: Instant,
-    val endTime: Instant
+    val endTime: Instant,
+    val sourceApp: String? = null
 )
 
 data class WeightData(
@@ -176,7 +178,9 @@ data class ExerciseData(
     val sourceApp: String?,
     val segments: List<ExerciseSegmentData>,
     val laps: List<ExerciseLapData>,
-    val steps: Long? = null
+    val steps: Long? = null,
+    val distanceMeters: Double? = null,
+    val calories: Double? = null
 )
 
 data class HydrationData(
@@ -191,7 +195,21 @@ data class NutritionData(
     val carbs: Double?,
     val fat: Double?,
     val startTime: Instant,
-    val endTime: Instant
+    val endTime: Instant,
+    val mealType: Int? = null,
+    val sugar: Double? = null,
+    val fiber: Double? = null,
+    val saturatedFat: Double? = null,
+    val monounsaturatedFat: Double? = null,
+    val polyunsaturatedFat: Double? = null,
+    val transFat: Double? = null,
+    val cholesterol: Double? = null,
+    val sodium: Double? = null,
+    val potassium: Double? = null,
+    val calcium: Double? = null,
+    val iron: Double? = null,
+    val vitaminA: Double? = null,
+    val sourceApp: String? = null
 )
 
 data class BasalMetabolicRateData(
@@ -413,45 +431,36 @@ class HealthConnectManager(private val context: Context) {
     }
 
     private suspend fun readDistanceData(startTime: Instant, endTime: Instant, lastSync: Instant?): List<DistanceData> {
-        // Aggregate distance per calendar day (same pattern as steps)
-        val zone = java.time.ZoneId.systemDefault()
-        val result = mutableListOf<DistanceData>()
-
-        val startLocalDate = startTime.atZone(zone).toLocalDate()
-        val endLocalDate = endTime.atZone(zone).toLocalDate()
-
-        var currentDate = startLocalDate
-        while (!currentDate.isAfter(endLocalDate)) {
-            val dayStart = currentDate.atStartOfDay(zone).toInstant()
-            val dayEnd = currentDate.plusDays(1).atStartOfDay(zone).toInstant()
-
-            val queryStart = if (dayStart.isBefore(startTime)) startTime else dayStart
-            val queryEnd = if (dayEnd.isAfter(endTime)) endTime else dayEnd
-
-            if (lastSync != null && queryEnd.isBefore(lastSync)) {
-                currentDate = currentDate.plusDays(1)
-                continue
-            }
-
-            val request = AggregateRequest(
-                metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
-                timeRangeFilter = TimeRangeFilter.between(queryStart, queryEnd)
+        // Read raw DistanceRecord entries with per-source visibility (same pattern as steps)
+        val allRecords = mutableListOf<DistanceRecord>()
+        var pageToken: String? = null
+        do {
+            val request = ReadRecordsRequest(
+                recordType = DistanceRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                pageToken = pageToken
             )
-            val response = healthConnectClient.aggregate(request)
-            val dayDistance = response[DistanceRecord.DISTANCE_TOTAL]?.inMeters ?: 0.0
+            val response = healthConnectClient.readRecords(request)
+            allRecords.addAll(response.records)
+            pageToken = response.pageToken
+        } while (pageToken != null)
 
-            if (dayDistance > 0.0) {
-                result.add(DistanceData(
-                    meters = dayDistance,
-                    startTime = dayStart,
-                    endTime = queryEnd
-                ))
-            }
+        val zone = java.time.ZoneId.systemDefault()
+        val filtered = allRecords.filter { record -> lastSync == null || record.endTime >= lastSync }
 
-            currentDate = currentDate.plusDays(1)
+        // Group by (calendar day, source app) and sum distance per group
+        val grouped = filtered.groupBy { record ->
+            Pair(record.startTime.atZone(zone).toLocalDate(), record.metadata.dataOrigin.packageName)
         }
 
-        return result
+        return grouped.mapNotNull { (key, records) ->
+            val (date, source) = key
+            val dayStart = date.atStartOfDay(zone).toInstant()
+            val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant()
+            val effectiveEnd = if (dayEnd.isAfter(endTime)) endTime else dayEnd
+            val total = records.sumOf { it.distance.inMeters }
+            if (total > 0.0) DistanceData(total, dayStart, effectiveEnd, source) else null
+        }.sortedWith(compareBy({ it.startTime }, { it.sourceApp }))
     }
 
     private suspend fun readActiveCaloriesData(startTime: Instant, endTime: Instant, lastSync: Instant?): List<ActiveCaloriesData> {
@@ -497,10 +506,36 @@ class HealthConnectManager(private val context: Context) {
     }
 
     private suspend fun readTotalCaloriesData(startTime: Instant, endTime: Instant, lastSync: Instant?): List<TotalCaloriesData> {
-        val request = ReadRecordsRequest(recordType = TotalCaloriesBurnedRecord::class, timeRangeFilter = TimeRangeFilter.between(startTime, endTime))
-        val response = healthConnectClient.readRecords(request)
-        return response.records.filter { lastSync == null || it.endTime >= lastSync }
-            .map { TotalCaloriesData(it.energy.inKilocalories, it.startTime, it.endTime) }
+        // Read raw records with per-source visibility (same pattern as steps/distance)
+        val allRecords = mutableListOf<TotalCaloriesBurnedRecord>()
+        var pageToken: String? = null
+        do {
+            val request = ReadRecordsRequest(
+                recordType = TotalCaloriesBurnedRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                pageToken = pageToken
+            )
+            val response = healthConnectClient.readRecords(request)
+            allRecords.addAll(response.records)
+            pageToken = response.pageToken
+        } while (pageToken != null)
+
+        val zone = java.time.ZoneId.systemDefault()
+        val filtered = allRecords.filter { record -> lastSync == null || record.endTime >= lastSync }
+
+        // Group by (calendar day, source app) and sum calories per group
+        val grouped = filtered.groupBy { record ->
+            Pair(record.startTime.atZone(zone).toLocalDate(), record.metadata.dataOrigin.packageName)
+        }
+
+        return grouped.mapNotNull { (key, records) ->
+            val (date, source) = key
+            val dayStart = date.atStartOfDay(zone).toInstant()
+            val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant()
+            val effectiveEnd = if (dayEnd.isAfter(endTime)) endTime else dayEnd
+            val total = records.sumOf { it.energy.inKilocalories }
+            if (total > 0.0) TotalCaloriesData(total, dayStart, effectiveEnd, source) else null
+        }.sortedWith(compareBy({ it.startTime }, { it.sourceApp }))
     }
 
     private suspend fun readWeightData(startTime: Instant, endTime: Instant, lastSync: Instant?): List<WeightData> {
@@ -564,13 +599,20 @@ class HealthConnectManager(private val context: Context) {
         val response = healthConnectClient.readRecords(request)
         return response.records.filter { lastSync == null || it.endTime >= lastSync }
             .map { session ->
-                // Query steps that fall within this exercise session's time window
-                val stepsRequest = ReadRecordsRequest(
-                    recordType = StepsRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(session.startTime, session.endTime)
-                )
+                // Query steps, distance, and calories within this exercise session's time window
+                val sessionTimeFilter = TimeRangeFilter.between(session.startTime, session.endTime)
+
+                val stepsRequest = ReadRecordsRequest(recordType = StepsRecord::class, timeRangeFilter = sessionTimeFilter)
                 val stepsResponse = healthConnectClient.readRecords(stepsRequest)
                 val sessionSteps = stepsResponse.records.sumOf { it.count }
+
+                val distanceRequest = ReadRecordsRequest(recordType = DistanceRecord::class, timeRangeFilter = sessionTimeFilter)
+                val distanceResponse = healthConnectClient.readRecords(distanceRequest)
+                val sessionDistance = distanceResponse.records.sumOf { it.distance.inMeters }
+
+                val caloriesRequest = ReadRecordsRequest(recordType = TotalCaloriesBurnedRecord::class, timeRangeFilter = sessionTimeFilter)
+                val caloriesResponse = healthConnectClient.readRecords(caloriesRequest)
+                val sessionCalories = caloriesResponse.records.sumOf { it.energy.inKilocalories }
 
                 ExerciseData(
                     type = exerciseTypeToString(session.exerciseType),
@@ -595,7 +637,9 @@ class HealthConnectManager(private val context: Context) {
                             lengthMeters = lap.length?.inMeters
                         )
                     },
-                    steps = if (sessionSteps > 0) sessionSteps else null
+                    steps = if (sessionSteps > 0) sessionSteps else null,
+                    distanceMeters = if (sessionDistance > 0.0) sessionDistance else null,
+                    calories = if (sessionCalories > 0.0) sessionCalories else null
                 )
             }
     }
@@ -746,7 +790,30 @@ class HealthConnectManager(private val context: Context) {
         val request = ReadRecordsRequest(recordType = NutritionRecord::class, timeRangeFilter = TimeRangeFilter.between(startTime, endTime))
         val response = healthConnectClient.readRecords(request)
         return response.records.filter { lastSync == null || it.endTime >= lastSync }
-            .map { NutritionData(it.energy?.inKilocalories, it.protein?.inGrams, it.totalCarbohydrate?.inGrams, it.totalFat?.inGrams, it.startTime, it.endTime) }
+            .map {
+                NutritionData(
+                    calories = it.energy?.inKilocalories,
+                    protein = it.protein?.inGrams,
+                    carbs = it.totalCarbohydrate?.inGrams,
+                    fat = it.totalFat?.inGrams,
+                    startTime = it.startTime,
+                    endTime = it.endTime,
+                    mealType = if (it.mealType != NutritionRecord.MEAL_TYPE_UNKNOWN) it.mealType else null,
+                    sugar = it.sugar?.inGrams,
+                    fiber = it.dietaryFiber?.inGrams,
+                    saturatedFat = it.saturatedFat?.inGrams,
+                    monounsaturatedFat = it.monounsaturatedFat?.inGrams,
+                    polyunsaturatedFat = it.polyunsaturatedFat?.inGrams,
+                    transFat = it.transFat?.inGrams,
+                    cholesterol = it.cholesterol?.inGrams,
+                    sodium = it.sodium?.inGrams,
+                    potassium = it.potassium?.inGrams,
+                    calcium = it.calcium?.inGrams,
+                    iron = it.iron?.inGrams,
+                    vitaminA = it.vitaminA?.inGrams,
+                    sourceApp = it.metadata.dataOrigin.packageName
+                )
+            }
     }
 
     private suspend fun readBasalMetabolicRateData(startTime: Instant, endTime: Instant, lastSync: Instant?): List<BasalMetabolicRateData> {
