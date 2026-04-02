@@ -175,7 +175,8 @@ data class ExerciseData(
     val notes: String?,
     val sourceApp: String?,
     val segments: List<ExerciseSegmentData>,
-    val laps: List<ExerciseLapData>
+    val laps: List<ExerciseLapData>,
+    val steps: Long? = null
 )
 
 data class HydrationData(
@@ -563,6 +564,14 @@ class HealthConnectManager(private val context: Context) {
         val response = healthConnectClient.readRecords(request)
         return response.records.filter { lastSync == null || it.endTime >= lastSync }
             .map { session ->
+                // Query steps that fall within this exercise session's time window
+                val stepsRequest = ReadRecordsRequest(
+                    recordType = StepsRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(session.startTime, session.endTime)
+                )
+                val stepsResponse = healthConnectClient.readRecords(stepsRequest)
+                val sessionSteps = stepsResponse.records.sumOf { it.count }
+
                 ExerciseData(
                     type = exerciseTypeToString(session.exerciseType),
                     startTime = session.startTime,
@@ -585,7 +594,8 @@ class HealthConnectManager(private val context: Context) {
                             endTime = lap.endTime,
                             lengthMeters = lap.length?.inMeters
                         )
-                    }
+                    },
+                    steps = if (sessionSteps > 0) sessionSteps else null
                 )
             }
     }

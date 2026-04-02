@@ -406,6 +406,7 @@ class SyncManager(private val context: Context) {
                         it.title?.let { t -> put("title", t) }
                         it.notes?.let { n -> put("notes", n) }
                         it.sourceApp?.let { s -> put("source_app", s) }
+                        it.steps?.let { steps -> put("steps", steps) }
                         if (it.segments.isNotEmpty()) {
                             putJsonArray("segments") {
                                 it.segments.forEach { seg -> add(buildJsonObject {
