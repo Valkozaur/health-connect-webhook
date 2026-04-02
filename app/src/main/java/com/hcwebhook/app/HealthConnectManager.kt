@@ -798,7 +798,7 @@ class HealthConnectManager(private val context: Context) {
                     fat = it.totalFat?.inGrams,
                     startTime = it.startTime,
                     endTime = it.endTime,
-                    mealType = if (it.mealType != NutritionRecord.MEAL_TYPE_UNKNOWN) it.mealType else null,
+                    mealType = if (it.mealType != 0) it.mealType else null,
                     sugar = it.sugar?.inGrams,
                     fiber = it.dietaryFiber?.inGrams,
                     saturatedFat = it.saturatedFat?.inGrams,
